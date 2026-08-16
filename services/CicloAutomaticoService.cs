@@ -6,6 +6,8 @@ namespace fluid_sim_monitor.services
     {
         private readonly FluidSimService _hardware;
 
+        public bool EmExecucao { get; private set; }
+
         public CicloAutomaticoService(FluidSimService hardware)
         {
             _hardware = hardware;
@@ -13,47 +15,54 @@ namespace fluid_sim_monitor.services
 
         public void ExecutarSequenciaInfinito(CancellationToken cancellationToken, int tempoUsinagemMs = 1500)
         {
-            while (!cancellationToken.IsCancellationRequested)
+            EmExecucao = true;
+
+            try
             {
-                if (!_hardware.PecaEstaPresente())
+                while (!cancellationToken.IsCancellationRequested)
                 {
-                    Thread.Sleep(200);
-                    continue;
+                    if (!_hardware.PecaEstaPresente())
+                    {
+                        Thread.Sleep(200);
+                        continue;
+                    }
+
+                    Console.WriteLine("peça detectada! iniciando sequência");
+
+                    // A+
+                    _hardware.AvancarA();
+                    if (!_hardware.AguardarPosicao(Atuador.AtuadorA, EnumsAtuador.Avancado))
+                    {
+                        Console.WriteLine("falha ao avançar o atuador A");
+                        break;
+                    }
+
+                    // B+
+                    _hardware.AvancarB();
+                    if (!_hardware.AguardarPosicao(Atuador.AtuadorB, EnumsAtuador.Avancado))
+                    {
+                        Console.WriteLine("falha ao avançar o atuador B");
+                        break;
+                    }
+
+                    Thread.Sleep(tempoUsinagemMs);
+
+                    // B-
+                    _hardware.RecuarB();
+                    _hardware.AguardarPosicao(Atuador.AtuadorB, EnumsAtuador.Recuado);
+
+                    // A-
+                    _hardware.RecuarA();
+                    _hardware.AguardarPosicao(Atuador.AtuadorA, EnumsAtuador.Recuado);
+
+                    Thread.Sleep(500);
                 }
-
-                Console.WriteLine("peça detectada! iniciando sequência");
-
-                // A+
-                _hardware.AvancarA();
-                if (!_hardware.AguardarPosicao(Atuador.AtuadorA, EnumsAtuador.Avancado))
-                {
-                    Console.WriteLine("falha ao avançar o atuador A");
-                    break;
-                }
-
-                // B+
-                _hardware.AvancarB();
-                if (!_hardware.AguardarPosicao(Atuador.AtuadorB, EnumsAtuador.Avancado))
-                {
-                    Console.WriteLine("falha ao avançar o atuador B");
-                    GarantirRetornoSeguro();
-                    break;
-                }
-
-                Thread.Sleep(tempoUsinagemMs);
-
-                // B-
-                _hardware.RecuarB();
-                _hardware.AguardarPosicao(Atuador.AtuadorB, EnumsAtuador.Recuado);
-
-                // A-
-                _hardware.RecuarA();
-                _hardware.AguardarPosicao(Atuador.AtuadorA, EnumsAtuador.Recuado);
-
-                Thread.Sleep(500);
             }
-
-            GarantirRetornoSeguro();
+            finally
+            {
+                GarantirRetornoSeguro();
+                EmExecucao = false;
+            }
         }
 
         private void GarantirRetornoSeguro()
@@ -66,7 +75,7 @@ namespace fluid_sim_monitor.services
             _hardware.AguardarPosicao(Atuador.AtuadorA, EnumsAtuador.Recuado);
 
             _hardware.DesligarTudo();
-            Console.WriteLine("todos os atuadores recuados em A0 e B0.");
+            Console.WriteLine("todos os atuadores foram recuados");
         }
     }
 }

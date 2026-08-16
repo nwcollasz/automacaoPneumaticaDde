@@ -19,8 +19,7 @@ namespace fluid_sim_monitor
                 ConsoleEstilo.EscreverColorido("=== PAINEL DE CONTROLE INDUSTRIAL ===", ConsoleColor.Cyan);
                 Console.WriteLine("1 - avançar A\n2 - recuar A");
                 Console.WriteLine("3 - avançar B\n4 - recuar B");
-                Console.WriteLine("5 - desligar tudo");
-                Console.WriteLine("6 - ciclo automático");
+                Console.WriteLine("5 - desligar tudo\n6 - ciclo automático");
                 Console.WriteLine("7 - sair");
                 ConsoleEstilo.EscreverColorido("---------------------------------------------------", ConsoleColor.Cyan);
 
@@ -28,7 +27,7 @@ namespace fluid_sim_monitor
 
                 while (comando != "7")
                 {
-                    Console.WriteLine(">> ");
+                    Console.Write(">> ");
                     comando = Console.ReadLine()?.Trim() ?? "";
 
                     switch (comando)
@@ -64,7 +63,16 @@ namespace fluid_sim_monitor
                             break;
 
                         case "6":
-                            ConsoleEstilo.EscreverColorido("ciclo automatico iniciado, aguardando peça S1 (ENTER para interromper)", ConsoleColor.Cyan);
+                            bool pecaPresente = service.PecaEstaPresente();
+                            
+                            if(pecaPresente == true)
+                            {
+                                ConsoleEstilo.EscreverColorido("ciclo automatico iniciado (ENTER para interromper)", ConsoleColor.Cyan);
+                            }
+                            else
+                            {
+                                ConsoleEstilo.EscreverColorido("ciclo automatico iniciado, aguardando peça S1 (ENTER para interromper)", ConsoleColor.Cyan);
+                            }
 
                             var ciclo = new CicloAutomaticoService(service);
 
@@ -72,9 +80,26 @@ namespace fluid_sim_monitor
                             {
                                 var tarefaCiclo = Task.Run(() => ciclo.ExecutarSequenciaInfinito(cts.Token, 1500));
 
-                                Console.ReadLine();
+                                while (!tarefaCiclo.IsCompleted)
+                                {
+                                    if (Console.KeyAvailable)
+                                    {
+                                        var tecla = Console.ReadKey(intercept: true);
 
-                                cts.Cancel();
+                                        if (tecla.Key == ConsoleKey.Enter)
+                                        {
+                                            cts.Cancel();
+                                            break;
+                                        }
+                                        else
+                                        {
+                                            ConsoleEstilo.EscreverColorido("impossível alterar estado ou recuar atuadores em funcionamento!!!", ConsoleColor.Yellow);
+                                            ConsoleEstilo.EscreverColorido("dê ENTER para desativar o ciclo automático primeiro!!!", ConsoleColor.DarkYellow);
+                                        }
+                                    }
+                                    Thread.Sleep(100);
+                                }
+
                                 tarefaCiclo.Wait();
                             }
 
@@ -88,7 +113,7 @@ namespace fluid_sim_monitor
                             break;
 
                         default:
-                            ConsoleEstilo.EscreverColorido("comando invalido!!!", ConsoleColor.Red);
+                            ConsoleEstilo.EscreverColorido("comando inválido!!!", ConsoleColor.Red);
                             break;
                     }
                 }
